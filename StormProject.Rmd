@@ -18,9 +18,9 @@ This data analysis attempts to address the following questions:
 Download file from course link: https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2
 
 ```{r load_data, cache = TRUE}
-data = read.csv(bzfile("repdata_data_StormData.csv.bz2"))
+df = read.csv(bzfile("repdata_data_StormData.csv.bz2"))
 ```
-The assignment asks for the event types across the U.S., and give EVTYPE as the variable encoding event types. From a quick look at data, the fatalities and injuries variables would seem logical measures of harm to population health. Potential variables for measuring economic consequences are: PROPDMG, CROPDMG (numbers) and PROPDMGEXP, CROPDMGEXP (factors). Potential location variables include: COUNTY (number), COUNTYNAME (factor), STATE (factor), BGN & END RANGE, AZI, LOCATI (all factors), STATEOFFIC, ZONENAMES (factors), LATITUDE, LONGITUDE, LATITUDE_E, and LONGITUDE_ (all numbers).  
+The assignment asks for the event types across the U.S., and gives EVTYPE as the variable encoding event types. From a quick look at data, the fatalities and injuries variables would seem logical measures of harm to population health. Potential variables for measuring economic consequences are: PROPDMG, CROPDMG (numbers) and PROPDMGEXP, CROPDMGEXP (factors). Potential location variables include: COUNTY (number), COUNTYNAME (factor), STATE (factor), BGN & END RANGE, AZI, LOCATI (all factors), STATEOFFIC, ZONENAMES (factors), LATITUDE, LONGITUDE, LATITUDE_E, and LONGITUDE_ (all numbers).  
 
 ### From the FAQ: 
 (https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf)
@@ -40,7 +40,6 @@ Operations and Services
 Performance, NWSPD 10-16   
 STORM DATA PREPARATION  
 
-
 - Section 2.1.1 contains a Storm Data Event Table which gives the types of events which are recorded. They are associated with three designators: C - County/Parish; Z - Zone; and M - Marine.    
 - Section 2.6.1.2 gives a Direct Fatality Location Table.   
 - Property damage estimates should be entered as actual dollar amounts.   
@@ -48,8 +47,52 @@ STORM DATA PREPARATION
 Who is the customer? What location data should be used: county, state, zone? The project instructions include: "Consider writing your report as if it were to be read by a government or municipal manager who might be responsible for preparing for severe weather events and will need to prioritize resources for different types of events." I'd imagine that storm episodes do not abide by geopolitical boundaries, so zone might be most approriate for clustering storms. However, since the user would probably be state or county governments, they would want to know if they were either directly effected or in a position to offer neighborly aid.
 
 ## Data Processing
-```{r pressure}
-plot(pressure)
+
+### Exploration
+Rank EVTTYPE by FATALITIES & INJURIES and then by PROPDMG & CROPDMG. Pie charts? 
+How to add location? How many locations are there? Can they be grouped by rankings?
+
+Explore location variables:
+
+```{r location}
+summary(df$STATE)
+summary(df$COUNTYNAME)
 ```
+
+Other than 2 "XX" state entries the state entries look fairly complete. County entries have 651640 of 902297 observations (72%) categorized as "other." Looks like state would be a reasonable start.
+
+How many event types occur in each state? Group data by state and count number of event types EVTTYPE for each.
+
+```{r evts_per_state}
+require(plyr)
+evts_per_state = ddply(df, "STATE", summarise,
+               NumEvnts    = length(unique(EVTYPE))
+)
+max(evts_per_state$NumEvnts)
+```
+
+There are a lot of event types for some states (max=143), so might be challenging to visualize a ranking of them all! Let's see how they rank by health harm & economic damage.
+
+```{r sum_by_state_evtype}
+require(plyr)
+sum_by_state_evtype = ddply(df, c("STATE","EVTYPE"), summarise,
+               NumEvtype    = length(EVTYPE),
+               EvtypeFatalities = sum(FATALITIES),
+               EvtypeInjuries = sum(INJURIES),
+               EvtypeTotalHeath = sum(FATALITIES) + sum(INJURIES),
+               EvtypePropDmg = sum(PROPDMG), 
+               EvtypeCropDmg = sum(CROPDMG),
+               EvtypeTotalDmg = sum(PROPDMG) + sum(CROPDMG)
+)
+
+health_by_state_evtype = arrange(sum_by_state_evtype[sum_by_state_evtype$EvtypeTotalHeath>0,], STATE, desc(EvtypeTotalHeath))
+
+dmg_by_state_evtype = arrange(sum_by_state_evtype[sum_by_state_evtype$EvtypeTotalDmg>0,], STATE, desc(EvtypeTotalDmg))
+
+```
+
+For each state list top evtype ranked by health or damage.
+state Health Damage
+name  evtype evtype
 
 ## Results
